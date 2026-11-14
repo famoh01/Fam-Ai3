@@ -1,0 +1,23 @@
+* -text
+*.yml text eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sln text eol=crlf
+*.vcxproj text eol=crlf
+*.filters text eol=crlf
+*.cur binary
+*.ico binary
+*.bmp binary
+*.png binary
+*.dds binary
+*.tex binary
+*.lib binary
+*.dll binary
+*.exe binary
+*.pdb binary
+*.lod binary
+*.dta binary
+*.sat binary
+*.sht binary

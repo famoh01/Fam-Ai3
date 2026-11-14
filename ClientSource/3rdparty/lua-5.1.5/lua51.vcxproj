@@ -1,0 +1,123 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build" ToolsVersion="15.0">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{D9E51500-5150-4A51-8515-000000515BCA}</ProjectGuid>
+    <RootNamespace>lua51</RootNamespace>
+    <ProjectName>lua51</ProjectName>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset Condition="'$(VisualStudioVersion)'=='17.0'">v143</PlatformToolset>
+    <PlatformToolset Condition="'$(VisualStudioVersion)'=='18.0'">v145</PlatformToolset>
+    <PlatformToolset Condition="'$(PlatformToolset)'==''">$(DefaultPlatformToolset)</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset Condition="'$(VisualStudioVersion)'=='17.0'">v143</PlatformToolset>
+    <PlatformToolset Condition="'$(VisualStudioVersion)'=='18.0'">v145</PlatformToolset>
+    <PlatformToolset Condition="'$(PlatformToolset)'==''">$(DefaultPlatformToolset)</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>../../Engine/lua/</OutDir>
+    <IntDir>./Debug/</IntDir>
+    <TargetName>lua5.1d</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>../../Engine/lua/</OutDir>
+    <IntDir>./Release/</IntDir>
+    <TargetName>lua5.1</TargetName>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+    <TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+    <TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="lapi.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lauxlib.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lbaselib.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lcode.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="ldblib.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="ldebug.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="ldo.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="ldump.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lfunc.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lgc.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="linit.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="liolib.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="llex.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lmathlib.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lmem.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="loadlib.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lobject.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lopcodes.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="loslib.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lparser.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lstate.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lstring.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lstrlib.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="ltable.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="ltablib.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="ltm.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lundump.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lvm.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+    <ClCompile Include="lzio.c"><TreatWarningAsError>false</TreatWarningAsError></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="lapi.h" />
+    <ClInclude Include="lauxlib.h" />
+    <ClInclude Include="lcode.h" />
+    <ClInclude Include="ldebug.h" />
+    <ClInclude Include="ldo.h" />
+    <ClInclude Include="lfunc.h" />
+    <ClInclude Include="lgc.h" />
+    <ClInclude Include="llex.h" />
+    <ClInclude Include="llimits.h" />
+    <ClInclude Include="lmem.h" />
+    <ClInclude Include="lobject.h" />
+    <ClInclude Include="lopcodes.h" />
+    <ClInclude Include="lparser.h" />
+    <ClInclude Include="lstate.h" />
+    <ClInclude Include="lstring.h" />
+    <ClInclude Include="ltable.h" />
+    <ClInclude Include="ltm.h" />
+    <ClInclude Include="lua.h" />
+    <ClInclude Include="luaconf.h" />
+    <ClInclude Include="lualib.h" />
+    <ClInclude Include="lundump.h" />
+    <ClInclude Include="lvm.h" />
+    <ClInclude Include="lzio.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

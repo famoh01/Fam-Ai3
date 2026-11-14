@@ -1,0 +1,28 @@
+# Visual Studio & MSBuild intermediate outputs ONLY
+# (Keep SDK/DX8/Lib/*.lib, Lib/VC100/*.lib, Ecc.exe, ServerRelease/**/*.exe tracked!)
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+*.sdf
+*.opensdf
+ipch/
+
+# Compiled outputs & intermediate object directories
+ClientSource/Bin/
+ClientSource/Directory.Build.targets
+ClientSource/**/_THAILIVE2010/
+ClientSource/**/_Debug2010/
+ClientSource/**/Debug/
+ClientSource/**/Release/
+ClientSource/**/*.obj
+ClientSource/**/*.pch
+ClientSource/**/*.idb
+ClientSource/**/*.ilk
+ClientSource/**/*.tlog
+ClientSource/**/*.lastbuildstate
+ClientSource/**/*.Build.CppClean.log
+Compiled_Output/

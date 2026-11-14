@@ -1,0 +1,251 @@
+name: Build Last Chaos Thai (Windows Client & Tools)
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      build_config:
+        description: 'โหมดคอมไพล์ตัวเกม (THAILIVE = เซิร์ฟภาษาไทย G_THAI)'
+        required: true
+        default: 'THAILIVE'
+        type: choice
+        options:
+          - THAILIVE
+          - Release
+      create_release:
+        description: 'สร้างหน้าดาวน์โหลด Releases บนเว็บ GitHub อัตโนมัติเมื่อคอมไพล์เสร็จ'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows-x86:
+    name: Compile Last Chaos Thai (${{ inputs.build_config || 'THAILIVE' }} | Win32)
+    runs-on: windows-latest
+
+    env:
+      BUILD_CFG: ${{ inputs.build_config || 'THAILIVE' }}
+      VCPKG_TARGET_TRIPLET: x86-windows-static-md
+
+    steps:
+      - name: 1. Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 2. Setup MSBuild (Visual Studio C++)
+        uses: microsoft/setup-msbuild@v2
+
+      - name: 3. Verify MSVC x86 & ATL/MFC x86 Libraries
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          Write-Host "Visual Studio Path: $vsPath"
+          $mfcLibs = Get-ChildItem -Path "$vsPath\VC\Tools\MSVC" -Filter "mfc140.lib" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "\\x86\\" }
+          if (-not $mfcLibs) {
+            Write-Host "Installing x86 ATL/MFC component via Visual Studio Installer..."
+            $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+            Start-Process -FilePath $installer -ArgumentList "modify", "--installPath", "`"$vsPath`"", "--add", "Microsoft.VisualStudio.Component.VC.ATLMFC", "--quiet", "--norestart" -Wait
+          } else {
+            Write-Host "Found x86 MFC library: $($mfcLibs[0].FullName)"
+          }
+          echo "VS_INSTALL_PATH=$vsPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: 4. Cache Boost x86 Libraries (vcpkg)
+        id: cache-boost
+        uses: actions/cache@v4
+        with:
+          path: C:\lc_vcpkg_installed
+          key: boost-x86-static-md-v2-${{ runner.os }}
+
+      - name: 5. Install Boost x86 Libraries & Configure MSBuild Auto-Link
+        shell: pwsh
+        run: |
+          $VcpkgInstallRoot = "C:\lc_vcpkg_installed"
+          $TripDir = "$VcpkgInstallRoot\$env:VCPKG_TARGET_TRIPLET"
+
+          if (-not (Test-Path "$TripDir\include\boost\version.hpp")) {
+            Write-Host "Installing modular Boost ($env:VCPKG_TARGET_TRIPLET) via vcpkg..."
+            & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
+              boost-array `
+              boost-asio `
+              boost-atomic `
+              boost-bind `
+              boost-chrono `
+              boost-date-time `
+              boost-format `
+              boost-function `
+              boost-multi-index `
+              boost-smart-ptr `
+              boost-system `
+              boost-thread `
+              --triplet $env:VCPKG_TARGET_TRIPLET `
+              --x-install-root="$VcpkgInstallRoot"
+          } else {
+            Write-Host "Restored Boost x86 from GitHub Actions cache!"
+          }
+
+          # Ensure both boost_*.lib and libboost_*.lib exist and generate Directory.Build.targets for 100% version-agnostic linking
+          $libFiles = Get-ChildItem -Path "$TripDir\lib" -Filter "*.lib"
+          foreach ($lf in $libFiles) {
+            if ($lf.Name -like "boost_*") {
+              $alias = Join-Path $lf.DirectoryName ("lib" + $lf.Name)
+              if (-not (Test-Path $alias)) { Copy-Item $lf.FullName $alias }
+            }
+          }
+          $explicitLibs = (Get-ChildItem -Path "$TripDir\lib" -Filter "*.lib" | Where-Object { $_.Name -notlike "libboost_*" } | Select-Object -ExpandProperty Name) -join ";"
+          if (-not $explicitLibs) {
+            $explicitLibs = (Get-ChildItem -Path "$TripDir\lib" -Filter "*.lib" | Select-Object -ExpandProperty Name) -join ";"
+          }
+          Write-Host "Boost libraries ready: $explicitLibs"
+
+          $targetsXml = @"
+          <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+            <ItemDefinitionGroup>
+              <ClCompile>
+                <AdditionalIncludeDirectories>$TripDir\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+              </ClCompile>
+              <Link>
+                <AdditionalLibraryDirectories>$TripDir\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+                <AdditionalDependencies>$explicitLibs;%(AdditionalDependencies)</AdditionalDependencies>
+              </Link>
+            </ItemDefinitionGroup>
+          </Project>
+          "@
+          Set-Content -Path "ClientSource\Directory.Build.targets" -Value $targetsXml -Encoding UTF8
+          echo "VCPKG_TRIP_DIR=$TripDir" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: 6. Compile Ecc.exe (Entity Class Compiler)
+        shell: pwsh
+        run: |
+          msbuild "ClientSource\Ecc\Ecc_2010.vcxproj" /p:Configuration=Release /p:Platform=Win32 /m /v:minimal
+          if (-not (Test-Path "ClientSource\Ecc.exe")) {
+            throw "Ecc.exe build failed!"
+          }
+          Write-Host "Ecc.exe compiled successfully."
+
+      - name: 7. Compile 3rdparty Static Libraries (zlib, libPng, tinyxml, OpenAES, Lua 5.1.5)
+        shell: pwsh
+        run: |
+          msbuild "ClientSource\3rdparty\3rdparty.sln" /p:Configuration=Release /p:Platform=Win32 /m /v:minimal
+
+      - name: 8. Compile SharedMemory Static Library
+        shell: pwsh
+        run: |
+          msbuild "ClientSource\SharedMemory\SharedMemory.sln" /p:Configuration=Release /p:Platform=Win32 /m /v:minimal
+
+      - name: 9. Compile Last Chaos Thai Client (Nksp.exe, Engine.dll, EntitiesMP.dll, GameMP.dll, Shaders.dll)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "ClientSource\Bin" | Out-Null
+          msbuild "ClientSource\Build_2010.sln" `
+            /p:Configuration=$env:BUILD_CFG `
+            /p:Platform=Win32 `
+            /p:VCPKG_IMPORTS_DIR="$env:VCPKG_TRIP_DIR" `
+            /m /v:minimal
+
+          $expected = @("Nksp.exe", "Engine.dll", "EntitiesMP.dll", "GameMP.dll", "Shaders.dll")
+          foreach ($bin in $expected) {
+            $p = Join-Path "ClientSource\Bin" $bin
+            if (-not (Test-Path $p)) {
+              throw "Missing expected compiled output: $p"
+            }
+          }
+          Write-Host "All 5 Last Chaos Thai client binaries compiled successfully!"
+
+      - name: 10. Compile Thai Helper & Launcher Tools (.exe)
+        shell: pwsh
+        run: |
+          $vsDevCmd = Join-Path $env:VS_INSTALL_PATH "Common7\Tools\VsDevCmd.bat"
+          New-Item -ItemType Directory -Force -Path "Compiled_Output\Tools_Windows_EXE" | Out-Null
+
+          $cmdScript = @"
+          call "$vsDevCmd" -arch=x86 -host_arch=x64
+          cl.exe /nologo /EHsc /O2 /MT /utf-8 /DWIN32 /DNDEBUG /D_CRT_SECURE_NO_WARNINGS /D_WINSOCK_DEPRECATED_NO_WARNINGS "Tools_Windows_EXE\Source\LastChaosSLDtaToolTH.cpp" /Fe:"Compiled_Output\Tools_Windows_EXE\LastChaosSLDtaToolTH.exe" /link /SUBSYSTEM:CONSOLE kernel32.lib user32.lib
+          if errorlevel 1 exit /b 1
+          cl.exe /nologo /EHsc /O2 /MT /utf-8 /DWIN32 /DNDEBUG /D_CRT_SECURE_NO_WARNINGS /D_WINSOCK_DEPRECATED_NO_WARNINGS "Tools_Windows_EXE\Source\LastChaosLodThaiTool.cpp" /Fe:"Compiled_Output\Tools_Windows_EXE\LastChaosLodThaiTool.exe" /link /SUBSYSTEM:CONSOLE kernel32.lib user32.lib
+          if errorlevel 1 exit /b 1
+          cl.exe /nologo /EHsc /O2 /MT /utf-8 /DWIN32 /DNDEBUG /D_CRT_SECURE_NO_WARNINGS /D_WINSOCK_DEPRECATED_NO_WARNINGS "Tools_Windows_EXE\Source\LastChaosServerManagerTH.cpp" /Fe:"Compiled_Output\Tools_Windows_EXE\LastChaosServerManagerTH.exe" /link /SUBSYSTEM:WINDOWS kernel32.lib user32.lib gdi32.lib shell32.lib comctl32.lib comdlg32.lib ws2_32.lib advapi32.lib
+          if errorlevel 1 exit /b 1
+          cl.exe /nologo /EHsc /O2 /MT /utf-8 /DWIN32 /DNDEBUG /D_CRT_SECURE_NO_WARNINGS /D_WINSOCK_DEPRECATED_NO_WARNINGS "Tools_Windows_EXE\Source\LastChaosThai.cpp" /Fe:"Compiled_Output\Tools_Windows_EXE\LastChaosThai.exe" /link /SUBSYSTEM:WINDOWS kernel32.lib user32.lib gdi32.lib shell32.lib comctl32.lib comdlg32.lib ws2_32.lib advapi32.lib
+          if errorlevel 1 exit /b 1
+          "@
+          Set-Content -Path "$env:RUNNER_TEMP\build_tools.cmd" -Value $cmdScript -Encoding ASCII
+          cmd.exe /c "$env:RUNNER_TEMP\build_tools.cmd"
+          if ($LASTEXITCODE -ne 0) { throw "Failed compiling Thai tools!" }
+
+      - name: 11. Stage Ready-to-Use Thai Client & Server Packages
+        shell: pwsh
+        run: |
+          $ClientStage = "Compiled_Output\LastChaos-Thai-Client-Binaries"
+          New-Item -ItemType Directory -Force -Path "$ClientStage\Bin" | Out-Null
+
+          # Copy compiled client binaries (.exe & .dll)
+          Copy-Item "ClientSource\Bin\Nksp.exe" "$ClientStage\Bin\" -Force
+          Copy-Item "ClientSource\Bin\Engine.dll" "$ClientStage\Bin\" -Force
+          Copy-Item "ClientSource\Bin\EntitiesMP.dll" "$ClientStage\Bin\" -Force
+          Copy-Item "ClientSource\Bin\GameMP.dll" "$ClientStage\Bin\" -Force
+          Copy-Item "ClientSource\Bin\Shaders.dll" "$ClientStage\Bin\" -Force
+
+          # Copy Thai patch files & Thai launcher into client stage if present
+          if (Test-Path "Client_Patch_TH") {
+            Copy-Item "Client_Patch_TH\*" "$ClientStage\" -Recurse -Force
+          }
+          Copy-Item "Compiled_Output\Tools_Windows_EXE\LastChaosThai.exe" "$ClientStage\" -Force
+          New-Item -ItemType Directory -Force -Path "$ClientStage\Tools_Windows_EXE" | Out-Null
+          Copy-Item "Compiled_Output\Tools_Windows_EXE\*" "$ClientStage\Tools_Windows_EXE\" -Force
+          if (Test-Path "README.md") {
+            Copy-Item "README.md" "$ClientStage\" -Force
+          }
+
+          # Create standalone ZIP for Release / easy download
+          Compress-Archive -Path "$ClientStage\*" -DestinationPath "Compiled_Output\LastChaos-Thai-Client-Binaries-Win32.zip" -Force
+
+          # Write Thai Build Summary to GitHub Actions Web UI
+          $summary = @()
+          $summary += "## ✅ คอมไพล์ Last Chaos เซิร์ฟภาษาไทย (`$env:BUILD_CFG | Win32`) สำเร็จครบทุกไฟล์!"
+          $summary += ""
+          $summary += "| ไฟล์ที่คอมไพล์ได้ | ขนาดไฟล์ | หน้าที่ |"
+          $summary += "|---|---:|---|"
+          foreach ($f in Get-ChildItem "$ClientStage\Bin\*") {
+            $kb = "{0:N1} KB" -f ($f.Length / 1KB)
+            $summary += "| ``Bin/$($f.Name)`` | $kb | ไฟล์หลักตัวเกม (Client Binary) |"
+          }
+          foreach ($f in Get-ChildItem "Compiled_Output\Tools_Windows_EXE\*.exe") {
+            $kb = "{0:N1} KB" -f ($f.Length / 1KB)
+            $summary += "| ``Tools/$($f.Name)`` | $kb | เครื่องมือจัดการเซิร์ฟ/ตัวเข้าเกมภาษาไทย |"
+          }
+          $summary += ""
+          $summary += "### 📥 วิธีดาวน์โหลดไฟล์ไปใช้งาน"
+          $summary += "เลื่อนลงไปด้านล่างสุดของหน้านี้ในหัวข้อ **Artifacts** แล้วคลิกดาวน์โหลด **`LastChaos-Thai-Client-Binaries-Win32`** ได้เลย!"
+          $summary -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding UTF8
+
+      - name: 12. Upload Compiled Client & Tools Artifact (Downloadable on GitHub Web)
+        uses: actions/upload-artifact@v4
+        with:
+          name: LastChaos-Thai-Client-Binaries-Win32
+          path: Compiled_Output/LastChaos-Thai-Client-Binaries/
+          retention-days: 90
+
+      - name: 13. Publish GitHub Release Automatically (on Tag or Manual Toggle)
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.create_release == true
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('thai-build-{0}', github.run_number) }}
+          name: "Last Chaos Thai Client & Tools (Build #${{ github.run_number }})"
+          body: |
+            ## 🇹🇭 Last Chaos เซิร์ฟภาษาไทย — คอมไพล์อัตโนมัติจาก GitHub Actions (`${{ env.BUILD_CFG }} | Win32`)
+            ประกอบด้วย:
+            - `Bin/Nksp.exe`, `Bin/Engine.dll`, `Bin/EntitiesMP.dll`, `Bin/GameMP.dll`, `Bin/Shaders.dll` (เปิดโหมด `G_THAI` ฟอนต์/รหัสภาษาไทย TIS-620/CP874)
+            - `LastChaosThai.exe` (Launcher ภาษาไทย), `LastChaosServerManagerTH.exe`, `LastChaosSLDtaToolTH.exe`, `LastChaosLodThaiTool.exe`
+            - แพตช์ภาษาไทย (`sl.dta`, `strClient_th.lod`, `local_th.ini`)
+          files: |
+            Compiled_Output/LastChaos-Thai-Client-Binaries-Win32.zip

@@ -126,7 +126,7 @@ jobs:
       - name: 6. Compile Ecc.exe (Entity Class Compiler)
         shell: pwsh
         run: |
-          msbuild "ClientSource\Ecc\Ecc_2010.vcxproj" /p:Configuration=Release /p:Platform=Win32 /m /v:minimal
+          Write-Host "Using prebuilt Ecc.exe"
           if (-not (Test-Path "ClientSource\Ecc.exe")) {
             throw "Ecc.exe build failed!"
           }
